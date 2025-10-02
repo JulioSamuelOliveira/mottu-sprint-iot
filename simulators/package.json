@@ -1,0 +1,8 @@
+{
+  "name": "mottu-iot-simulators",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "eventsource": "^2.0.2"
+  }
+}

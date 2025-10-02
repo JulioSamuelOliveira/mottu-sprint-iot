@@ -1,6 +1,6 @@
 # Desafio Mottu – RFID Pátio de Motos (Sprint IoT/Visão)
 
-> Protótipo funcional com **sensores simulados (IoT via HTTP + SSE)**, **dashboard em tempo real**, **persistência (SQLite)** e **métricas**. Opcionalmente, módulo de **Visão Computacional com Roboflow** para detecção de motos via webcam/câmera.
+> Protótipo funcional com **sensores simulados (IoT via HTTP + SSE)**, **dashboard em tempo real**, **persistência (SQLite)** e **métricas**. Opcionalmente, **Visão Computacional com Roboflow** para detecção de motos via webcam/câmera.
 
 ---
 
@@ -8,17 +8,8 @@
 
 * Demonstrar **integração em tempo real** entre dispositivos (simulados) e backend.
 * Exibir **dashboard/output visual** com eventos/alertas e métricas.
-* Persistir dados e **evidenciar desempenho** (latência média/p95, throughput) com endpoints próprios.
-* Entregar **casos de uso realistas**: *moto desaparecida*, *moto em zona errada*, *fluxo de cancela*.
-
-Rubrica atendida:
-
-* Comunicação sensores/visão ⇄ backend (até **30 pts**)
-* Dashboard/output visual (até **30 pts**)
-* Persistência e estruturação (até **20 pts**)
-* Organização do código + documentação (**este README**) (até **20 pts**)
-
-Penalidades evitadas: vídeo explicativo, dashboard funcional, dados persistidos e integração, projeto coerente.
+* Persistir dados e **evidenciar desempenho** (latência média/p95, throughput).
+* Entregar **casos de uso**: *moto desaparecida*, *moto em zona errada*, *fluxo de cancela*.
 
 ---
 
@@ -28,7 +19,7 @@ Penalidades evitadas: vídeo explicativo, dashboard funcional, dados persistidos
 * **Express** (API + SSE)
 * **SQLite** via `better-sqlite3` (modo WAL)
 * **HTML/JS** (dashboard)
-* **(Opcional)** Roboflow (Hosted API) para visão computacional
+* **(Opcional)** Roboflow (Hosted API) p/ visão computacional
 
 ---
 
@@ -46,10 +37,10 @@ Penalidades evitadas: vídeo explicativo, dashboard funcional, dados persistidos
 (Opcional) Webcam -> [/vc/detect -> Roboflow] -> eventos em /ingest (reuso das regras)
 ```
 
-Regras implementadas:
+**Regras**
 
-* **Zone mismatch**: placa/identificador detectado em zona diferente da esperada → alerta `wrong_zone`.
-* **Heartbeat (desaparecida)**: sem leituras por >30s → alerta `missing`.
+* **Zone mismatch**: placa/ID na zona errada → alerta `wrong_zone`.
+* **Heartbeat (desaparecida)**: >30s sem leituras → alerta `missing`.
 
 ---
 
@@ -59,15 +50,28 @@ Regras implementadas:
 mottu-sprint-iot/
 ├─ server/
 │  ├─ package.json
-│  ├─ server.js          # API, SSE, regras, métricas, dashboard static
+│  ├─ server.js          # API, SSE, regras, métricas, dashboard estático
 │  ├─ dashboard.html     # UI em tempo real
 │  ├─ vc_proxy.js        # (opcional) proxy Roboflow
-│  ├─ vc_client.html     # (opcional) cliente de webcam para visão
+│  ├─ vc_client.html     # (opcional) cliente de webcam p/ visão
 │  └─ events.db          # gerado automaticamente
-└─ simulators/
-   ├─ sim_rfid.js        # leitor RFID (3 zonas + 3 placas)
-   ├─ sim_distance.js    # sensor distância/ocupação por zona
-   └─ sim_gate.js        # atuador cancela (ouve /commands via SSE)
+├─ simulators/
+│  ├─ package.json       # (novo) dependência eventsource
+│  ├─ sim_rfid.js        # leitor RFID (3 zonas + 3 placas)
+│  ├─ sim_distance.js    # sensor distância/ocupação por zona
+│  └─ sim_gate.js        # atuador cancela (ouve /commands via SSE)
+└─ .gitignore            # ignora DB local e artefatos
+```
+
+**.gitignore sugerido**
+
+```
+node_modules/
+npm-debug.log*
+.DS_Store
+server/events.db
+server/events.db-shm
+server/events.db-wal
 ```
 
 ---
@@ -75,7 +79,7 @@ mottu-sprint-iot/
 ## ⚙️ Pré‑requisitos
 
 * **Node.js 18+** (`node -v`)
-* Não requer Docker. Sem compilação nativa (bibliotecas puras).
+* Sem Docker obrigatório. Sem compilação nativa além do `better-sqlite3` (já pré‑compilado na maioria dos ambientes).
 
 ---
 
@@ -92,15 +96,17 @@ npm start
 
 ### 2) Simuladores (3 terminais)
 
+> Os simuladores usam `eventsource` no Node para escutar comandos. Instale as deps dentro da pasta `simulators/`.
+
 ```bash
+cd simulators
+npm i
 # A - RFID
-node simulators/sim_rfid.js
-
+node sim_rfid.js
 # B - Distância
-node simulators/sim_distance.js
-
+node sim_distance.js
 # C - Cancela (atuador)
-node simulators/sim_gate.js
+node sim_gate.js
 ```
 
 ### 3) Dashboard
@@ -113,24 +119,24 @@ node simulators/sim_gate.js
 
 ## 🧪 Casos de teste (apresentação)
 
-1. **Moto em zona errada**: o simulador RFID injeta ~10% de leituras em zonas incorretas → surge alerta `⚠️ Moto fora de posição`.
+1. **Moto em zona errada**: o simulador RFID injeta ~10% de leituras erradas → alerta `⚠️ Moto fora de posição`.
 2. **Moto desaparecida**: pare `sim_rfid.js` por >30s → alerta `🚨 Moto desaparecida`.
-3. **Fluxo da cancela**: acione **Abrir** → estados `opening → open`; acione **Fechar** → `closing → closed`.
+3. **Fluxo da cancela**: clique **Abrir** → estados `opening → open`; clique **Fechar** → `closing → closed`.
 
 > Todos os eventos ficam persistidos em `server/events.db`.
 
 ---
 
-## 📊 Métricas & Endpoints úteis
+## 📊 Endpoints & Métricas
 
 * `GET /metrics` → `{ window_min, avg_latency_ms, p95_latency_ms, events_last5min, alerts_last5min }`
 * `GET /events?limit=100` → últimas linhas (debug/histórico)
 * `POST /ingest` → ingestão de telemetria
 * `GET /stream` (SSE) → feed para dashboard
 * `POST /command { target, action }` → comandos (ex.: `gate-1`, `open|close`)
-* `GET /commands` (SSE) → stream de comandos para atuadores
+* `GET /commands` (SSE) → stream de comandos p/ atuadores
 
-Consultas SQL rápidas (SQLite):
+**SQL úteis (SQLite)**
 
 ```sql
 -- últimos 50 eventos
@@ -143,9 +149,9 @@ SELECT AVG(ts_server - ts_device) AS avg_latency FROM events WHERE ts_device IS 
 
 ---
 
-## 🧩 Opção de Visão (Roboflow)
+## 🧩 Visão Computacional (Roboflow) – Opcional
 
-> **Opcional**: substitui/complenta sensores usando detecção de motos pela webcam.
+> Substitui/complementa sensores via detecção de motos pela webcam.
 
 ### Variáveis de ambiente
 
@@ -157,16 +163,16 @@ ROBOFLOW_VERSION=1
 
 ### Passos rápidos
 
-1. **Backend**: em `server/vc_proxy.js` monte o proxy para `/vc/detect` (chama a Hosted API do Roboflow) e no `server.js`:
+1. **Backend**: em `server/vc_proxy.js` exponha `/vc/detect` (chama a Hosted API do Roboflow) e, no `server.js`:
 
    ```js
    import { mountVcProxy } from './vc_proxy.js';
    mountVcProxy(app);
    ```
-2. **Frontend**: abra `server/vc_client.html`, clique em **Start Webcam**. Cada detecção vira um **evento em `/ingest`** com `type: "rfid"` (reuso das regras / alertas), e as zonas são definidas por retângulos no próprio cliente.
-3. **Demonstração**: mova a “moto” entre Z1/Z2/Z3 para gerar `wrong_zone`; esconda-a >30s para `missing`.
+2. **Frontend**: abra `server/vc_client.html`, clique em **Start Webcam**. Cada detecção vira um **evento em `/ingest`** com `type: "rfid"` (reuso das regras/alertas). Zonas (Z1/Z2/Z3) definidas no cliente.
+3. **Demonstração**: mova a “moto” entre zonas para gerar `wrong_zone`; esconda-a >30s para `missing`.
 
-> Alternativas: Roboflow Inference (Docker offline), WebSocket em vez de SSE (1:1), RTSP via `ffmpeg` para gerar frames.
+> Alternativas: Roboflow Inference (Docker offline), WebSocket em vez de SSE (1:1), RTSP via `ffmpeg` para frames.
 
 ---
 
@@ -180,9 +186,10 @@ ROBOFLOW_VERSION=1
 ## 🐞 Troubleshooting
 
 * **Porta ocupada** → altere `PORT` via env (`PORT=3001 npm start`).
-* **better-sqlite3** com erro em CPU antiga/ARM → reinstale (`npm rebuild`) ou troque por `sqlite3`.
-* **SSE bloqueado** em proxy → verifique CORS/NGINX e cabeçalhos `Cache-Control`, `Connection`.
-* **Roboflow 401/403** → cheque `ROBOFLOW_*` e limite de requisições do plano.
+* **better-sqlite3** com erro em CPU antiga/ARM → `npm rebuild` ou usar `sqlite3`.
+* **SSE bloqueado** (proxy/rede) → verifique CORS/NGINX e cabeçalhos `Cache-Control`, `Connection`.
+* **Roboflow 401/403** → cheque `ROBOFLOW_*` e limites do plano.
+* **EventSource no Node (sim_gate)** → garanta `simulators/package.json` com `eventsource` instalado.
 
 ---
 
@@ -191,5 +198,3 @@ ROBOFLOW_VERSION=1
 * Julio Samuel De Oliveira — RM557453
 * Bruno Da Silva Souza — RM94346
 * Leonardo Da Silva Pereira — RM557598
-
----

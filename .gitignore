@@ -1,0 +1,9 @@
+# Node/Editor
+node_modules/
+npm-debug.log*
+.DS_Store
+
+# DB local
+server/events.db
+server/events.db-shm
+server/events.db-wal

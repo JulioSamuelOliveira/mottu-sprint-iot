@@ -2,6 +2,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { mountVcProxy } from './vc_proxy.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,7 @@ req.on('close', () => cmdClients.delete(res));
 });
 
 const PORT = process.env.PORT || 3000;
+mountVcProxy(app);
 app.listen(PORT, () => console.log(`Backend on http://localhost:${PORT}`));
 
 import { mountVcProxy } from "./vc_proxy.js";
