@@ -1,0 +1,90 @@
+<!doctype html>
+<button id="refreshMetrics">Atualizar métricas</button>
+</div>
+<div class="card">
+    <h3>Comandos</h3>
+    <div class="row">
+        <button onclick="sendCmd('gate-1','open')">Abrir Cancela</button>
+        <button onclick="sendCmd('gate-1','close')">Fechar Cancela</button>
+    </div>
+    <p style="margin-top:8px">Últimos comandos:</p>
+    <ul id="cmds"></ul>
+</div>
+</div>
+
+
+<div class="grid" style="margin-top:12px">
+    <div class="card">
+        <h3>Últimos eventos</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ts</th>
+                    <th>device</th>
+                    <th>type</th>
+                    <th>zone</th>
+                    <th>payload</th>
+                </tr>
+            </thead>
+            <tbody id="events"></tbody>
+        </table>
+    </div>
+    <div class="card">
+        <h3>Alertas</h3>
+        <ul id="alerts"></ul>
+    </div>
+</div>
+
+
+<script>
+    const ev = new EventSource('/stream');
+    const eventsEl = document.getElementById('events');
+    const alertsEl = document.getElementById('alerts');
+    const metricsEl = document.getElementById('metrics');
+    const cmdsEl = document.getElementById('cmds');
+
+
+    const counters = { total: 0, rfid: 0, dist: 0, gate: 0 };
+
+
+    ev.onmessage = (m) => {
+        const obj = JSON.parse(m.data);
+        if (obj.kind === 'event') {
+            counters.total++;
+            if (obj.type === 'rfid') counters.rfid++; else if (obj.type === 'distance') counters.dist++; else if (obj.type === 'gate') counters.gate++;
+            document.getElementById('total').textContent = counters.total;
+            document.getElementById('rfid').textContent = counters.rfid;
+            document.getElementById('dist').textContent = counters.dist;
+            document.getElementById('gate').textContent = counters.gate;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${new Date(obj.ts_server).toLocaleTimeString()}</td><td>${obj.device_id}</td><td>${obj.type}</td><td>${obj.zone_id || ''}</td><td><code>${JSON.stringify(obj.payload)}</code></td>`;
+            eventsEl.prepend(tr);
+        } else if (obj.kind === 'alert') {
+            const li = document.createElement('li');
+            if (obj.type === 'missing') li.innerHTML = `🚨 <b>Moto desaparecida</b> placa ${obj.plate} às ${new Date(obj.ts).toLocaleTimeString()}`;
+            else if (obj.type === 'wrong_zone') li.innerHTML = `⚠️ <b>Moto fora de posição</b> ${obj.plate}: esperado ${obj.expected}, atual ${obj.actual} (${new Date(obj.ts).toLocaleTimeString()})`;
+            alertsEl.prepend(li);
+        } else if (obj.kind === 'command') {
+            const li = document.createElement('li');
+            li.textContent = `${obj.target} -> ${obj.action} @ ${new Date(obj.ts).toLocaleTimeString()}`;
+            cmdsEl.prepend(li);
+        }
+    };
+
+
+    async function loadMetrics() {
+        const r = await fetch('/metrics');
+        const j = await r.json();
+        metricsEl.textContent = JSON.stringify(j, null, 2);
+    }
+    document.getElementById('refreshMetrics').onclick = loadMetrics;
+    loadMetrics();
+
+
+    async function sendCmd(target, action) {
+        await fetch('/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, action }) });
+    }
+</script>
+</body>
+
+</html>
