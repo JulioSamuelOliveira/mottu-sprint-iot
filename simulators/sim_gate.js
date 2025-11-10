@@ -1,32 +1,23 @@
-import EventSource from 'eventsource';
+import fetch from "node-fetch";
 
-const ENDPOINT = 'http://localhost:3000/ingest';
-const CMDSTREAM = 'http://localhost:3000/commands';
-const fetchJson = (url, body) =>
-  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+const BASE = process.env.TARGET_BASE || "http://localhost:3000";
+const DEVICE = "gate-1";
 
-let state = 'closed';
-
-function sendStatus(){
-  const body = { device_id:'gate-1', type:'gate', payload:{ state }, ts_device: Date.now(), zone_id: null };
-  fetchJson(ENDPOINT, body);
+async function pullCommands() {
+  try {
+    const r = await fetch(`${BASE}/commands?deviceId=${DEVICE}`);
+    const cmds = await r.json();
+    cmds.forEach(c => console.log(`[sim_gate] received command`, c));
+  } catch {}
 }
 
-function handle(action){
-  if (action === 'open' && state !== 'open') { state = 'opening'; sendStatus(); setTimeout(()=>{state='open';sendStatus();}, 1200); }
-  if (action === 'close' && state !== 'closed') { state = 'closing'; sendStatus(); setTimeout(()=>{state='closed';sendStatus();}, 1200); }
+async function heartbeat() {
+  const body = { deviceId: DEVICE, sensorType: "gate", value: Math.random() > 0.5 ? 1 : 0, ts: Date.now() };
+  try {
+    await fetch(`${BASE}/ingest`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  } catch {}
 }
 
-function start(){
-  const es = new EventSource(CMDSTREAM);
-  es.onmessage = (m) => {
-    try {
-      const { target, action } = JSON.parse(m.data);
-      if (target === 'gate-1') handle(action);
-    } catch { /* no-op */ }
-  };
-  sendStatus(); // estado inicial
-  console.log('Gate simulator running');
-}
-
-start();
+setInterval(heartbeat, 1200);
+setInterval(pullCommands, 2000);
+console.log(`[sim_gate] publishing to ${BASE} as ${DEVICE}`);

@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: IoT Yard API
+  version: "1.0.0"
+paths:
+  /ingest:
+    post:
+      summary: Ingestão de leitura de sensor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, sensorType, value]
+              properties:
+                deviceId: { type: string }
+                sensorType: { type: string, enum: [rfid, distance, gate, other] }
+                value: { type: number }
+                ts: { type: integer, format: int64 }
+      responses:
+        "201": { description: OK }
+  /events:
+    get:
+      summary: Últimos eventos
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+  /metrics:
+    get:
+      summary: Métricas de latência e throughput
+      responses:
+        "200": { description: OK }
+  /stream:
+    get:
+      summary: Server-Sent Events
+      responses:
+        "200": { description: OK }
+  /command:
+    post:
+      summary: Criar comando para um device
+      responses:
+        "201": { description: OK }
+  /commands:
+    get:
+      summary: Buscar comandos pendentes por deviceId
+      parameters:
+        - in: query
+          name: deviceId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: OK }

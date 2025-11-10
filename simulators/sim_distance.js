@@ -1,21 +1,16 @@
-const ENDPOINT = 'http://localhost:3000/ingest';
-const fetchJson = (url, body) =>
-  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+import fetch from "node-fetch";
 
-const zones = ['Z1','Z2','Z3'];
+const BASE = process.env.TARGET_BASE || "http://localhost:3000";
+const DEVICE = "dist-1";
 
-function distFor(zone){
-  const base = zone==='Z1'? 30 : zone==='Z2'? 60 : 90; // variação por zona
-  return Math.max(5, Math.round(base + (Math.random()*20 - 10)));
+async function tick() {
+  // distância em cm (carro aproximando/afastando)
+  const value = Math.round(50 + 30 * Math.sin(Date.now()/2000));
+  const body = { deviceId: DEVICE, sensorType: "distance", value, ts: Date.now() };
+  try {
+    await fetch(`${BASE}/ingest`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  } catch {}
 }
 
-async function tick(){
-  for (const z of zones){
-    const payload = { distance_cm: distFor(z), threshold_occupied: 50 };
-    const body = { device_id:`ultra-${z}`, type:'distance', payload, ts_device: Date.now(), zone_id: z };
-    await fetchJson(ENDPOINT, body);
-  }
-}
-
-setInterval(tick, 3000);
-console.log('Distance simulator running');
+setInterval(tick, 900);
+console.log(`[sim_distance] publishing to ${BASE} as ${DEVICE}`);

@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  server:
+    build: ./server
+    container_name: iot_server
+    env_file:
+      - ./server/.env.example
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server:/app
+    command: ["npm","start"]
+
+  simulators:
+    build:
+      context: ./simulators
+    container_name: iot_simulators
+    depends_on:
+      - server
+    environment:
+      - TARGET_BASE=http://server:3000
+    volumes:
+      - ./simulators:/app
+    command: ["npm","start"]

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"/>
+  <title>IoT Yard – Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    header { display: flex; gap: 12px; align-items: baseline; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+    .list { max-height: 380px; overflow: auto; }
+    .muted { color: #6b7280; font-size: 12px; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
+    h3 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IoT Yard</h1>
+    <a href="/openapi.yml" target="_blank" class="muted">OpenAPI</a>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Eventos (tempo real)</h3>
+      <div class="muted" id="metrics"></div>
+      <div class="list">
+        <table id="eventsTable">
+          <thead>
+            <tr><th>#</th><th>device</th><th>sensor</th><th>valor</th><th>latência(ms)</th><th>quando</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Enviar Comando</h3>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <input id="cmdDevice" placeholder="deviceId ex: gate-1"/>
+        <input id="cmdName" placeholder="command ex: open_gate"/>
+        <input id="cmdPayload" placeholder='payload JSON opcional'/>
+        <button id="sendBtn">Enviar</button>
+        <div class="muted" id="cmdStatus"></div>
+      </div>
+
+      <hr/>
+      <h3>Comandos enviados (stream)</h3>
+      <div class="list">
+        <table id="cmdTable">
+          <thead><tr><th>#</th><th>device</th><th>cmd</th><th>payload</th><th>quando</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const fmt = (ms) => new Date(ms).toLocaleTimeString();
+    const tbody = document.querySelector("#eventsTable tbody");
+    const cmdBody = document.querySelector("#cmdTable tbody");
+    const metricsEl = document.querySelector("#metrics");
+
+    async function refreshMetrics() {
+      const r = await fetch("/metrics");
+      const m = await r.json();
+      metricsEl.textContent = `amostras=${m.samples} | p95=${m.latency_ms?.p95}ms | avg=${m.latency_ms?.avg}ms | tps=${m.tps}`;
+    }
+    refreshMetrics();
+    setInterval(refreshMetrics, 3000);
+
+    // SSE
+    const es = new EventSource("/stream");
+    es.addEventListener("event", (ev) => {
+      const data = JSON.parse(ev.data);
+      const lat = Math.max(0, data.serverTs - data.clientTs);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${data.id}</td><td>${data.deviceId}</td><td>${data.sensorType}</td>
+                      <td>${data.value}</td><td>${lat}</td><td>${fmt(data.serverTs)}</td>`;
+      tbody.prepend(tr);
+      // Cap a 300 linhas
+      if (tbody.children.length > 300) tbody.removeChild(tbody.lastChild);
+    });
+    es.addEventListener("command", (ev) => {
+      const c = JSON.parse(ev.data);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${c.id}</td><td>${c.deviceId}</td><td>${c.command}</td>
+                      <td>${c.payload ?? ""}</td><td>${fmt(c.createdAt)}</td>`;
+      cmdBody.prepend(tr);
+      if (cmdBody.children.length > 200) cmdBody.removeChild(cmdBody.lastChild);
+    });
+
+    // Envio de comando
+    document.querySelector("#sendBtn").onclick = async () => {
+      const deviceId = document.querySelector("#cmdDevice").value.trim();
+      const command = document.querySelector("#cmdName").value.trim();
+      const payloadText = document.querySelector("#cmdPayload").value.trim();
+      let payload = null;
+      if (payloadText) {
+        try { payload = JSON.parse(payloadText); } catch { alert("Payload JSON inválido"); return; }
+      }
+      const r = await fetch("/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, command, payload })
+      });
+      const t = await r.json();
+      document.querySelector("#cmdStatus").textContent = r.ok ? `OK (#${t.id})` : `Erro: ${JSON.stringify(t)}`;
+    };
+  </script>
+</body>
+</html>

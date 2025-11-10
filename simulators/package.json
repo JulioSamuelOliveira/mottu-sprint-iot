@@ -1,8 +1,12 @@
 {
-  "name": "mottu-iot-simulators",
+  "name": "organized-scan",
   "version": "1.0.0",
   "type": "module",
+  "main": "sim_rfid.js",
+  "scripts": {
+    "start": "node sim_rfid.js & node sim_gate.js & node sim_distance.js"
+  },
   "dependencies": {
-    "eventsource": "^2.0.2"
+    "node-fetch": "^3.3.2"
   }
 }

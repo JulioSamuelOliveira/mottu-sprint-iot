@@ -1,24 +1,21 @@
-const ENDPOINT = 'http://localhost:3000/ingest';
+import fetch from "node-fetch";
 
-const fetchJson = (url, body) =>
-  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+const BASE = process.env.TARGET_BASE || "http://localhost:3000";
+const DEVICE = "rfid-1";
+const TAGS = ["MOT-1001","MOT-1002","MOT-2003","MOT-7777","MOT-8888"];
 
-const plates = ['PLT-1234','PLT-9876','PLT-5555'];
-const zones = ['Z1','Z2','Z3'];
-
-function randItem(a){ return a[Math.floor(Math.random()*a.length)]; }
-
-async function tick(){
-  const plate = randItem(plates);
-  const wrong = Math.random() < 0.1; // 10% para gerar alerta
-  const zone = wrong
-    ? randItem(zones.filter(z => !((plate==='PLT-1234'&&z==='Z1')||(plate==='PLT-9876'&&z==='Z2')||(plate==='PLT-5555'&&z==='Z3'))))
-    : (plate==='PLT-1234'?'Z1':plate==='PLT-9876'?'Z2':'Z3');
-
-  const payload = { plate, reader_strength: Math.round(50 + 50*Math.random()) };
-  const body = { device_id: `rfid-${zone}`, type:'rfid', payload, ts_device: Date.now(), zone_id: zone };
-  await fetchJson(ENDPOINT, body);
+async function tick() {
+  const tag = TAGS[Math.floor(Math.random()*TAGS.length)];
+  const body = {
+    deviceId: DEVICE,
+    sensorType: "rfid",
+    value: tag,
+    ts: Date.now() - Math.floor(Math.random()*200) // simula jitter
+  };
+  try {
+    await fetch(`${BASE}/ingest`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  } catch {}
 }
 
-setInterval(tick, 1500);
-console.log('RFID simulator running');
+setInterval(tick, 700);
+console.log(`[sim_rfid] publishing to ${BASE} as ${DEVICE}`);
